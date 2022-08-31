@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
   labels:
     type: local # Sets PV's type
-    app: prometheus-deployment
+    app: prometheus-server
 spec:
   storageClassName: manual
   capacity:
@@ -13,4 +13,4 @@ spec:
   accessModes:
     - ReadWriteMany
   hostPath:
-    path: /opt/data-nas/minikube/prometheus # Sets PV's host path
+    path: /data/prometheus # Sets PV's host path

@@ -4,7 +4,7 @@ metadata:
   name: pvc-prometheus # Sets PVC's name
   namespace: monitoring
   labels:
-    name: prometheus-deployment # Defines app to create PVC for
+   app: prometheus-server
 spec:
   storageClassName: manual
   accessModes:

@@ -17,6 +17,13 @@ spec:
         app: prometheus-server
 
     spec:
+      initContainers:
+      - name: prometheus-data-permission-setup
+        image: busybox
+        command: ["/bin/chmod","-R","777", "/prometheus"]
+        volumeMounts:
+        - name: prometheus-storage-volume
+          mountPath: /prometheus
       containers:
         - name: prometheus
           image: prom/prometheus
@@ -26,10 +33,10 @@ spec:
           ports:
             - containerPort: 9090
           volumeMounts:
-            - name: prometheus-config-volume
-              mountPath: /etc/prometheus/
-            - name: prometheus-storage-volume
-              mountPath: /prometheus/
+            - mountPath: /etc/prometheus/
+              name: prometheus-config-volume
+            - mountPath: /prometheus/
+              name: prometheus-storage-volume
       volumes:
         - name: prometheus-config-volume
           configMap:

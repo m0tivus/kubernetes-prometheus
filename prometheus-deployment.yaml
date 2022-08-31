@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prometheus-deployment
-  namespace: monitoring
+  namespace: monitoring-prometheus
   labels:
     app: prometheus-server
 spec:
@@ -18,12 +18,12 @@ spec:
 
     spec:
       initContainers:
-      - name: prometheus-data-permission-setup
-        image: busybox
-        command: ["/bin/chmod","-R","777", "/prometheus"]
-        volumeMounts:
-        - name: prometheus-storage-volume
-          mountPath: /prometheus
+        - name: prometheus-data-permission-setup
+          image: busybox
+          command: ["/bin/chmod", "-R", "777", "/prometheus"]
+          volumeMounts:
+            - name: prometheus-storage-volume
+              mountPath: /prometheus
       containers:
         - name: prometheus
           image: prom/prometheus

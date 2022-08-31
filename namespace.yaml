@@ -1,6 +1,6 @@
 kind: Namespace
 apiVersion: v1
 metadata:
-  name: monitoring
+  name: monitoring-prometheus
   labels:
-    name: wb-api
+    name: prometheus

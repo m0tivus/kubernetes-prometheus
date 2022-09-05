@@ -1,3 +1,17 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: prometheus-proxy-config
+  namespace: monitoring-prometheus
+spec:
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+    type: HTTP
+    requestPath: /-/healthy
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -6,6 +20,7 @@ metadata:
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "9090"
+    cloud.google.com/backend-config: '{"ports": {"80":"prometheus-proxy-config"}}'
     cloud.google.com/neg: '{"ingress": true}'
 
 spec:

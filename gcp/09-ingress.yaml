@@ -22,4 +22,4 @@ spec:
               service:
                 name: prometheus-service
                 port:
-                  number: 80
+                  name: svc-port

@@ -1,0 +1,247 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    name: prometheus
+  name: monitoring-prometheus
+---
+apiVersion: v1
+data:
+  prometheus.rules: |-
+    groups:
+    - name: devopscube demo alert
+      rules:
+      - alert: High_Pod_Memory
+        expr: sum(container_memory_usage_bytes) > 1
+        for: 1m
+        labels:
+          severity: slack
+        annotations:
+          summary: High Memory Usage
+          description: HMU
+  prometheus.yml: "global:\n  scrape_interval: 5s\n  evaluation_interval: 5s\nrule_files:\n
+    \ - /etc/prometheus/prometheus.rules\nalerting:\n  alertmanagers:\n  - scheme:
+    http\n    static_configs:\n    - targets:\n      - \"alertmanager.monitoring-alert.svc:9093\"\n\nscrape_configs:\n
+    \ - job_name: \"wb-api\"\n    static_configs:\n      - targets: ['waterbear.api.motivus.cl']
+    \n      \n  - job_name: 'node-exporter'\n    kubernetes_sd_configs:\n      - role:
+    endpoints\n    relabel_configs:\n    - source_labels: [__meta_kubernetes_endpoints_name]\n
+    \     regex: 'node-exporter'\n      action: keep\n  \n  - job_name: 'kubernetes-apiservers'\n\n
+    \   kubernetes_sd_configs:\n    - role: endpoints\n    scheme: https\n\n    tls_config:\n
+    \     ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n    bearer_token_file:
+    /var/run/secrets/kubernetes.io/serviceaccount/token\n\n    relabel_configs:\n
+    \   - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name,
+    __meta_kubernetes_endpoint_port_name]\n      action: keep\n      regex: default;kubernetes;https\n\n
+    \ - job_name: 'kubernetes-nodes'\n\n    scheme: https\n\n    tls_config:\n      ca_file:
+    /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token\n\n
+    \   kubernetes_sd_configs:\n    - role: node\n\n    relabel_configs:\n    - action:
+    labelmap\n      regex: __meta_kubernetes_node_label_(.+)\n    - target_label:
+    __address__\n      replacement: kubernetes.default.svc:443\n    - source_labels:
+    [__meta_kubernetes_node_name]\n      regex: (.+)\n      target_label: __metrics_path__\n
+    \     replacement: /api/v1/nodes/${1}/proxy/metrics     \n  \n  - job_name: 'kubernetes-pods'\n\n
+    \   kubernetes_sd_configs:\n    - role: pod\n\n    relabel_configs:\n    - source_labels:
+    [__meta_kubernetes_pod_annotation_prometheus_io_scrape]\n      action: keep\n
+    \     regex: true\n    - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]\n
+    \     action: replace\n      target_label: __metrics_path__\n      regex: (.+)\n
+    \   - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]\n
+    \     action: replace\n      regex: ([^:]+)(?::\\d+)?;(\\d+)\n      replacement:
+    $1:$2\n      target_label: __address__\n    - action: labelmap\n      regex: __meta_kubernetes_pod_label_(.+)\n
+    \   - source_labels: [__meta_kubernetes_namespace]\n      action: replace\n      target_label:
+    kubernetes_namespace\n    - source_labels: [__meta_kubernetes_pod_name]\n      action:
+    replace\n      target_label: kubernetes_pod_name\n  \n  - job_name: 'kube-state-metrics'\n
+    \   static_configs:\n      - targets: ['kube-state-metrics.kube-system.svc.cluster.local:8080']\n\n
+    \ - job_name: 'kubernetes-cadvisor'\n\n    scheme: https\n\n    tls_config:\n
+    \     ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n    bearer_token_file:
+    /var/run/secrets/kubernetes.io/serviceaccount/token\n\n    kubernetes_sd_configs:\n
+    \   - role: node\n\n    relabel_configs:\n    - action: labelmap\n      regex:
+    __meta_kubernetes_node_label_(.+)\n    - target_label: __address__\n      replacement:
+    kubernetes.default.svc:443\n    - source_labels: [__meta_kubernetes_node_name]\n
+    \     regex: (.+)\n      target_label: __metrics_path__\n      replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor\n
+    \ \n  - job_name: 'kubernetes-service-endpoints'\n\n    kubernetes_sd_configs:\n
+    \   - role: endpoints\n\n    relabel_configs:\n    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]\n
+    \     action: keep\n      regex: true\n    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]\n
+    \     action: replace\n      target_label: __scheme__\n      regex: (https?)\n
+    \   - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]\n
+    \     action: replace\n      target_label: __metrics_path__\n      regex: (.+)\n
+    \   - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]\n
+    \     action: replace\n      target_label: __address__\n      regex: ([^:]+)(?::\\d+)?;(\\d+)\n
+    \     replacement: $1:$2\n    - action: labelmap\n      regex: __meta_kubernetes_service_label_(.+)\n
+    \   - source_labels: [__meta_kubernetes_namespace]\n      action: replace\n      target_label:
+    kubernetes_namespace\n    - source_labels: [__meta_kubernetes_service_name]\n
+    \     action: replace\n      target_label: kubernetes_name"
+kind: ConfigMap
+metadata:
+  labels:
+    name: prometheus-server-conf
+  name: prometheus-server-conf
+  namespace: monitoring-prometheus
+---
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: prometheus-storage
+parameters:
+  fstype: ext4
+  replication-type: none
+  type: pd-ssd
+provisioner: kubernetes.io/gce-pd
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: monitoring-prometheus
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: prometheus-storage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: monitoring-prometheus
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus-server
+  name: prometheus-deployment
+  namespace: monitoring-prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-server
+  template:
+    metadata:
+      labels:
+        app: prometheus-server
+    spec:
+      containers:
+      - args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus/
+        image: prom/prometheus
+        name: prometheus
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - mountPath: /etc/prometheus/
+          name: prometheus-config-volume
+        - mountPath: /prometheus/
+          name: prometheus-storage-volume
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: prometheus-server-conf
+        name: prometheus-config-volume
+      - name: prometheus-storage-volume
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/port: "9090"
+    prometheus.io/scrape: "true"
+  name: prometheus-service
+  namespace: monitoring-prometheus
+spec:
+  ports:
+  - port: 80
+    targetPort: 9090
+  selector:
+    app: prometheus-server
+  type: NodePort
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: prometheus-apis
+  namespace: monitoring-prometheus
+spec:
+  domains:
+  - apis.prometheus.motivus.cl
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: prometheus-apis
+    networking.gke.io/managed-certificates: prometheus-apis
+  name: prometheus-ui
+  namespace: monitoring-prometheus
+spec:
+  rules:
+  - host: apis.prometheus.motivus.cl
+    http:
+      paths:
+      - backend:
+          service:
+            name: prometheus-service
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - prometheus.apps.shaker242.lab
+    secretName: prometheus-secret
+---
+apiVersion: v1
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUZpVENDQkhHZ0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBRENCd0RFak1DRUdBMVVFQXhNYWFXNTAKWlhKdFpXUnBZWFJsTG5Ob1lXdGxjakkwTWk1c1lXSXhDekFKQmdOVkJBWVRBbFZUTVJFd0R3WURWUVFJRXdoVwphWEpuYVc1cFlURVFNQTRHQTFVRUJ4TUhRbkpwYzNSdmR6RXNNQ29HQTFVRUNoTWpVMGhCUzBWU01qUXlJRXhoCllpQkRaWEowYVdacFkyRjBaU0JCZFhSb2IzSnBkSGt4T1RBM0JnTlZCQXNUTUZOSVFVdEZVakkwTWlCTVlXSWcKU1c1MFpYSnRaV1JwWVhSbElFTmxjblJwWm1sallYUmxJRUYxZEdodmNtbDBlVEFlRncweE9URXdNVGN4TmpFMgpNekZhRncweU1URXdNVFl4TmpFMk16RmFNSUdBTVIwd0d3WURWUVFERkJRcUxtRndjSE11YzJoaGEyVnlNalF5CkxteGhZakVMTUFrR0ExVUVCaE1DVlZNeEVUQVBCZ05WQkFnVENGWnBjbWRwYm1saE1SQXdEZ1lEVlFRSEV3ZEMKY21semRHOTNNUll3RkFZRFZRUUtFdzFUU0VGTFJWSXlORElnVEdGaU1SVXdFd1lEVlFRTEV3eE1ZV0lnVjJWaQpjMmwwWlhNd2dnRWlNQTBHQ1NxR1NJYjNEUUVCQVFVQUE0SUJEd0F3Z2dFS0FvSUJBUURsRm16QVd0U09JcXZNCkpCV3Vuc0VIUmxraXozUmpSK0p1NTV0K0hCUG95YnZwVkJJeXMxZ3prby9INlkxa2Zxa1JCUzZZYVFHM2lYRFcKaDgzNlNWc3pNVUNVS3BtNXlZQXJRNzB4YlpPTXRJcjc1VEcrejFaRGJaeFUzbnh6RXdHdDN3U3c5OVJ0bjhWbgo5dEpTVXI0MHBHUytNemMzcnZOUFZRMjJoYTlhQTdGL2NVcGxtZUpkUnZEVnJ3Q012UklEcndXVEZjZkU3bUtxCjFSUkRxVDhETnlydlJmeUlubytmSkUxTmRuVEVMY0dTYVZlajhZVVFONHY0WFRnLzJncmxIN1pFT1VXNy9oYm8KUXh6NVllejVSam1wOWVPVUpvdVdmWk5FNEJBbGRZeVYxd2NPRXhRTmswck5BOU45ZXBjNWtUVVZQR3pOTWRucgovVXQxOWMweEFnTUJBQUdqZ2dIS01JSUJ4akFKQmdOVkhSTUVBakFBTUJFR0NXQ0dTQUdHK0VJQkFRUUVBd0lHClFEQUxCZ05WSFE4RUJBTUNCYUF3TXdZSllJWklBWWI0UWdFTkJDWVdKRTl3Wlc1VFUwd2dSMlZ1WlhKaGRHVmsKSUZObGNuWmxjaUJEWlhKMGFXWnBZMkYwWlRBZEJnTlZIUTRFRmdRVWRhYy94MTR6dXl3RVZPSi9vTjdQeU82bApDZ2N3Z2RzR0ExVWRJd1NCMHpDQjBJQVVzZFM1WWxuWEpWTk5mRVpkTEQvL2RyNE5mV3FoZ2JTa2diRXdnYTR4CkdUQVhCZ05WQkFNVEVHTmhMbk5vWVd0bGNqSTBNaTVzWVdJeEN6QUpCZ05WQkFZVEFsVlRNUkV3RHdZRFZRUUkKRXdoV2FYSm5hVzVwWVRFUU1BNEdBMVVFQnhNSFFuSnBjM1J2ZHpFc01Db0dBMVVFQ2hNalUwaEJTMFZTTWpReQpJRXhoWWlCRFpYSjBhV1pwWTJGMFpTQkJkWFJvYjNKcGRIa3hNVEF2QmdOVkJBc1RLRk5JUVV0RlVqSTBNaUJNCllXSWdVbTl2ZENCRFpYSjBhV1pwWTJGMFpTQkJkWFJvYjNKcGRIbUNBUUV3SFFZRFZSMGxCQll3RkFZSUt3WUIKQlFVSEF3RUdDQ3NHQVFVRkNBSUNNRWdHQTFVZEVRUkJNRCtDRFhOb1lXdGxjakkwTWk1c1lXS0NFbUZ3Y0hNdQpjMmhoYTJWeU1qUXlMbXhoWW9JVUtpNWhjSEJ6TG5Ob1lXdGxjakkwTWk1c1lXS0hCTUNvQ3hBd0RRWUpLb1pJCmh2Y05BUUVMQlFBRGdnRUJBRzA3ZHFNdFZYdVQrckduQlN4SkVTNjNSa2pHaWd0c3ZtNTk4NSsrbjZjRW5kSDIKb2hjaGdmRUo5V0UxYUFWSDR4QlJSdVRIUFVJOFcvd3N1OFBxQ1o4NHpRQ2U2elAyeThEcmEwbjFzK2lIeHFwRAorS3BwZS91NkNLVTFEL0VWRU9MakpZd3pRYlFLSUlPL2Y1Q0JVbUpGWjBuZ1VIUEtvUDNyTXordTlBOWFvRkVrCnF3dDBadHFHcWpjMkh3Q09UOTlOVmFsZ29ISXljOElxQXJXdjNSWklraUlyaW9kSUdDMS94MVQ2dHhKcEUyRisKQzZ0Tzk0U0FVSUJwc2VORjNFbGNLNUsyTW44YVAzR3NnNFRHeElPN2Q1eUIvb3YwNGhOV2Q1S2QwWGorL1BvQgpLOU43cFQ1SVU2citLekNoeGlSdmRvZlAzV0VYN1ZkNEtLWG94K0U9Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JSUV2d0lCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktrd2dnU2xBZ0VBQW9JQkFRRGxGbXpBV3RTT0lxdk0KSkJXdW5zRUhSbGtpejNSalIrSnU1NXQrSEJQb3lidnBWQkl5czFnemtvL0g2WTFrZnFrUkJTNllhUUczaVhEVwpoODM2U1Zzek1VQ1VLcG01eVlBclE3MHhiWk9NdElyNzVURyt6MVpEYlp4VTNueHpFd0d0M3dTdzk5UnRuOFZuCjl0SlNVcjQwcEdTK016YzNydk5QVlEyMmhhOWFBN0YvY1VwbG1lSmRSdkRWcndDTXZSSURyd1dURmNmRTdtS3EKMVJSRHFUOEROeXJ2UmZ5SW5vK2ZKRTFOZG5URUxjR1NhVmVqOFlVUU40djRYVGcvMmdybEg3WkVPVVc3L2hibwpReHo1WWV6NVJqbXA5ZU9VSm91V2ZaTkU0QkFsZFl5VjF3Y09FeFFOazByTkE5TjllcGM1a1RVVlBHek5NZG5yCi9VdDE5YzB4QWdNQkFBRUNnZ0VCQU5zOHRjRDBiQnpHZzRFdk8yek0wMUJoKzZYN3daZk4wSjV3bW5kNjZYYkwKc1VEZ1N6WW9PbzNJZ2o5QWZTY2lyQ3YwdUozMVNFWmNpeGRVQ2tTdjlVNnRvTzdyUWdqeUZPM1N1dm5Wc3ZKaQpTZXc5Y0hqNk5jVDczak8rWkgxQVFFZ2tlWG5mQTNZU0JEcTFsSnhpUVZOaHpHUFY0Yzh4Wi9xUkhEbUVBTWR6CmwyaTB6dHJtcWRqSng4aTQxOXpGL1pVektoa2JtcVZVb3JjZ1lNdEt5QVloSENMYms2RFZtQ1FhbDlndEUrNjUKTmFTOEwxUW9yVWNVS0FoSTNKT2Q2TTRwbWRPaExITjZpZ0VwWFdVWGxBZjRITUZicHd5M1oxejNqZzVqTE9ragp6SWNDSVRaai9CYVZvSVc4QzJUb0pieUJKWkN6UDVjUVJTdkJOOGV4aUFFQ2dZRUEvV0Nxb2xVUWtOQkQrSnlPCklXOUJIRVlPS3oxRFZxNWxHRFhoNFMyTStpOU1pck5nUlcvL0NFRGhRUVVMZmtBTDgxMERPQmxsMXRRRUpGK3cKb1V6dWt6U1lkK1hTSnhicTM5YTF1ZGJldTNZU1ljeC8wTEEweGFQOW1sN1l1NXUraUZ4NGhwcnYyL2UrVklZQQpzTWV4WkZSODA3Q3M5YXN5MkdFT1l2aEdKb0VDZ1lFQTUzVm1weFlQbDFOYTVTMElJbEpuYm40dTl0RHpwYm5TCnpsMjBVQ3Q0d0N4STR6YjY1S1o4V1VaYlFzVTVaZ0VqTmxJWURXUisrd3kwVXh2SmNxUG5nS0xuOEdoSzhvOVEKeVJuR2dSYXAxWmNuUEdsbGdCeHQzM0s5TDNWMmJzMXBPcGJKMGlpOVdySWM4MU1wUVFpQjZ1RDRSZ216M0ZWSQpnUk5Ec2ZHS0xyRUNnWUVBbWY5ZXRqc3RUbGJHZVJ2dDVyUlB4bmR0dFNvTysyZ1RXWnVtSmM0aG1RMldYOWFWCjlKNFZTMWJqa1RrWHV5d0NGMis0dlNmeWxaZFd6U1M3bmMyOFV3dnNmekxYZjVxV05tV3hIYnBTdFcwVnp3c1QKeENyVWFDczd2ODlWdXZEMTVMc1BKZ0NWT0FSalVjd0FMM0d2aDJNeVd4ZE9pQ0g5VFRYd0lJYjFYQUVDZ1lBMwp4ZUptZ0xwaERJVHFsRjlSWmVubWhpRnErQTY5OEhrTG9TakI2TGZBRnV1NVZKWkFZcDIwSlcvNE51NE4xbGhWCnpwSmRKOG94Vkc1ZldHTENiUnhyc3RXUTZKQ213a0lGTTJEUjJsUXlVNm53dExUd21la2YzdFlYaVlad1RLNysKbnpjaW5RNkR2RWVkbW54bVgxWnU4cWJndVpYTmtmOVdtdjNFOHg4SkFRS0JnUUNNeDFWNHJIcUpwVXJMdkRVVQo4RzhXVGNrT2VFM2o2anhlcHMwcnExdEd1cE9XWW5saFlNYyt5VkMzMDZUc2dXUmJ5R1Y4YWNaRkF4WS9Ub2N5CmxpcXlUS1NGNUloYXhZQVpRTzVkOU1oTmN0bTRReDNaOUtTekZ5ZG01QlZVL0grMFFmUnRwM29TeFVneXRZNXkKV3ZDTFZ5bmNGZlZpL0VkaTdaZHM2aW82QVE9PQotLS0tLUVORCBQUklWQVRFIEtFWS0tLS0tCg==
+kind: Secret
+metadata:
+  name: prometheus-secret
+  namespace: monitoring-prometheus

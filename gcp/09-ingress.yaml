@@ -1,0 +1,25 @@
+## Nginx Ingress
+## Follow https://devopscube.com/setup-ingress-kubernetes-nginx-controller/
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus-ui
+  namespace: monitoring-prometheus
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: prometheus-apis
+    networking.gke.io/managed-certificates: prometheus-apis
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+    # Use the host you used in your kubernetes Ingress Configurations
+    - host: apis.prometheus.motivus.cl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus-service
+                port:
+                  number: 80

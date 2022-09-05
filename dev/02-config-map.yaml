@@ -10,13 +10,14 @@ data:
     groups:
     - name: devopscube demo alert
       rules:
-      - alert: High Pod Memory
+      - alert: High_Pod_Memory
         expr: sum(container_memory_usage_bytes) > 1
         for: 1m
         labels:
           severity: slack
         annotations:
           summary: High Memory Usage
+          description: HMU
   prometheus.yml: |-
     global:
       scrape_interval: 5s
@@ -28,12 +29,13 @@ data:
       - scheme: http
         static_configs:
         - targets:
-          - "alertmanager.monitoring.svc:9093"
+          - "alertmanager.monitoring-alert.svc:9093"
 
     scrape_configs:
       - job_name: "wb-api"
         static_configs:
           - targets: ['wb-api.wb-api:80']
+          
       - job_name: 'node-exporter'
         kubernetes_sd_configs:
           - role: endpoints

@@ -1,0 +1,8 @@
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  namespace: monitoring-prometheus
+  name: prometheus-apis
+spec:
+  domains:
+    - apis.prometheus.motivus.cl

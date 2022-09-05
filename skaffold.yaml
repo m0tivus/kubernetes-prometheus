@@ -2,14 +2,29 @@ apiVersion: skaffold/v2beta27
 kind: Config
 metadata:
   name: kubernetes-prometheus
-deploy:
-  kubectl:
-    manifests:
-      - namespace.yaml
-      - clusterRole.yaml
-      - config-map.yaml
-      - prometheus-pv.yaml
-      - prometheus-pvc.yaml
-      - prometheus-deployment.yaml
-      - prometheus-service.yaml
-      - prometheus-ingress.yaml
+profiles:
+  - name: local
+    deploy:
+      kubectl:
+        manifests:
+          - dev/01-namespace.yaml
+          - dev/02-config-map.yaml
+          - dev/03-pv.yaml
+          - dev/04-pvc.yaml
+          - dev/05-cluster-role.yaml
+          - dev/06-deployment.yaml
+          - dev/07-service.yaml
+          - dev/08-ingress.yaml
+  - name: gcp
+    deploy:
+      kubectl:
+        manifests:
+          - gcp/01-namespace.yaml
+          - gcp/02-config-map.yaml
+          - gcp/03-storage-class.yaml
+          - gcp/04-pvc.yaml
+          - gcp/05-cluster-role.yaml
+          - gcp/06-deployment.yaml
+          - gcp/07-service.yaml
+          - gcp/08-certificate.yaml
+          - gcp/09-ingress.yaml
